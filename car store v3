@@ -1,0 +1,597 @@
+from Car import Car
+from tkinter import *
+from tkinter import messagebox
+import csv
+
+toyotaCSV = open('toyota.csv', 'r')
+toyotaData = csv.reader(toyotaCSV)
+
+subaruCSV = open('subaru.csv', 'r')
+subaruData = csv.reader(subaruCSV)
+
+holdenCSV = open('holden.csv', 'r')
+holdenData = csv.reader(holdenCSV)
+
+hondaCSV = open('honda.csv', 'r')
+hondaData = csv.reader(hondaCSV)
+
+
+# combines the data from all csv's to the car list
+def csvParser(file):
+    for row in file:
+        if row in [[]]:
+            continue
+        else:
+            name = str(row[0].strip())
+            model = str(row[1].strip())
+            year = int(row[2].strip())
+            colour = str(row[3].strip())
+            price = float(row[4].strip())
+            availability = int(row[5].strip())
+            car_list.append(Car(name, model, year, colour, price))
+
+
+car_list = []
+csvParser(toyotaData)
+csvParser(subaruData)
+csvParser(holdenData)
+csvParser(hondaData)
+
+
+def get_car(cname):
+    #   finds the car in car list
+    for car in car_list:
+        if car.get_name() == cname:
+            return car
+    print("Car not found")  # debug message, will print to console
+
+
+root = Tk()
+
+root.title("Used Car Dealership")
+root.configure(background="#E3D2AF", pady="5", padx="7")
+
+main_window_width = 450.0
+main_window_height = 470.0
+
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
+
+#   positions the GUI in the center of the screen
+main_x = screen_width / 2 - main_window_width / 2
+main_y = screen_height / 2 - main_window_height / 2
+
+root.geometry("%dx%d+%d+%d" % (main_window_height, main_window_height, main_x, main_y))
+root.option_add("*Font", "LucindaGrande 17")
+
+root.resizable(False, False)
+
+
+def update_details():
+    car_name = car_selector.get(ACTIVE)
+    current_car = get_car(car_name)
+    print(current_car)
+
+    #   updates details for the car details listed below
+    str_availability.set("Availability: " + str(current_car.get_availability()))
+    str_model.set("Model: " + str(current_car.get_model()))
+    str_year.set("Year: " + str(current_car.get_year()))
+    str_colour.set("Colour: " + str(current_car.get_colour()))
+    str_price.set("Price: $ " + str(current_car.get_price()))
+
+
+def addtolist_contact():
+    global contactList
+    contactList.append([])
+    for item in contactList:
+        if item.get() != "":
+            contactList.append(item.get())
+    print(contactList)
+
+    messagebox.showinfo('Added', 'Details have been added')
+
+    update_details()
+    close_window
+
+
+contactList = []
+
+
+def sold_list(car):
+    global soldList
+
+    soldList.append([car.get_name(), car.get_model(), car.get_year(), car.get_colour(), car.get_price()])
+    print(soldList)
+    update_details()
+    close_window
+
+
+soldList = []
+
+
+def extraFeatureList(error, window, car):
+    for item in varList_extra:
+        if item.get() != "":
+            featureList.append(item.get())
+            print(featureList)
+
+    if len(featureList) == 0:
+        error.set("Please select any extra options")
+        return
+    else:
+        messagebox.showinfo('Added', "You have successfully bought the {} {} with extra features for {}".format(
+            car.get_name(), car.get_model(), car.get_extra_features() + car.get_price()))
+
+        get_car(car_selector.get(ACTIVE)).sell_car()
+        sold_list(car)
+        contact_details(car)
+        delete_car(car)
+        close_window(window)
+        update_details()
+
+        for feature in featureList:
+            allSoldFeaturesList.append(feature)
+        featureList.clear()
+
+
+featureList = []
+allSoldFeaturesList = []
+
+
+def cars_purchased(car):
+    price_count = 0.00
+    car_count = 0
+    extra_count = 0.00
+
+    #   gets the total amount of cars sold, price accumulated, extra features cost and adds it to csv purchased
+    for c in car_list:
+        price_count += c.get_price_total()
+        car_count += c.get_stock_sold_count()
+        extra_count += c.get_extra_features()
+
+    if car.get_stock_sold_count() == 0:
+        messagebox.showerror('Selection of cars missing', "You have not sold any cars yet")
+        return
+
+    elif len(contactList) == 0:
+        messagebox.showerror('Contact missing', "You have not entered the customers contact details yet")
+        return
+
+    else:
+        with open('carsPurchased.csv', 'w', newline='') as file:  # opens existing csv file to write to
+            writer = csv.writer(file)
+
+            # Prints Purchase summary at the top of the csv
+            writer.writerow(['Purchase summary: '])
+
+            # Prints cars bought
+            csv_cars_bought = soldList
+            cars_bought_str = 'Cars bought' + str(csv_cars_bought)
+            writer.writerow([cars_bought_str])
+
+            # Prints extra features
+            csv_extra_features = allSoldFeaturesList
+            extra_features_str = 'Extra features purchased' + str(csv_extra_features)
+            writer.writerow([extra_features_str])
+
+            # Prints extra features cost
+            extra_features_price_str = f'Extra features cost: $ {extra_count}'
+            writer.writerow([extra_features_price_str])
+
+            # Prints delivery option
+            csv_contact = contactList
+            contact_str = 'Contact details: ' + str(csv_contact)
+            writer.writerow([contact_str])
+
+            # Prints total price
+            price_total_str = f'Total price: $ {price_count}'
+            writer.writerow([price_total_str])
+
+            # Prints total cars sold
+            sold_total_str = f'Total Cars Sold: {car_count}'
+            writer.writerow([sold_total_str])
+
+        messagebox.showinfo('Exported to csv',
+                            "Car purchase information has been finalised and exported to a csv. Please check ")
+
+
+def sell_car(car):
+    if car.get_availability() < 1:
+        messagebox.showwarning('Sell car', "The {} {} has been sold and is no longer available to buy.".format
+        (car.get_name(), car.get_model()))
+        return
+        close_window
+
+    car_window = Toplevel(root)
+    car_window.title("Extra options")
+    car_window.option_add("*Font", "LucidaGrande 11")
+
+    car_width = 370
+    car_height = 220
+
+    #   positions the label in the center of the screen
+    car_x = screen_width / 2 - car_width / 2
+    car_y = screen_height / 2 - car_height / 2
+
+    car_window.geometry(
+        "%dx%d+%d+%d" % (car_width, car_height, car_x, car_y))
+
+    Label(car_window,
+          text="*Select any extra features to add for the {} {}*".format(car.get_name(), (car.get_model()))).grid(row=0,
+                                                                                                                  column=1,
+                                                                                                                  sticky=N + E + W + S)
+
+    MsgBox = messagebox.askquestion('Add extra options',
+                                    'Would you like to purchase any extra options (eg. insurance) for the {} {} '.format
+                                    (car.get_name(), car.get_model()), icon='info')
+    global extraSelect
+    extraSelect = False
+    global varList_extra
+    varList_extra = []
+
+    if MsgBox == 'yes':
+        extraSelect = True
+        car_name = car_selector.get(ACTIVE)
+
+        if car_name == car.get_name():
+            var1 = StringVar()  # checkbutton for extended warranty
+            Checkbutton(car_window, text="Extended warranty($710)", variable=var1, onvalue="Extended warranty($710)",
+                        offvalue="", command=lambda: car.extended_warranty()).grid(row=1, column=1, sticky=W)
+
+            var2 = StringVar()  # checkbutton for after market wheels
+            Checkbutton(car_window, text="After market wheels($320)", variable=var2,
+                        onvalue="After market wheels($320)",
+                        offvalue="", command=lambda: car.after_market()).grid(row=2, column=1, sticky=W)
+
+            var3 = StringVar()  # checkbutton for tinted windows
+            Checkbutton(car_window, text="Tinted windows(450)", variable=var3, onvalue="Tinted windows(450)",
+                        offvalue="", command=lambda: car.tinted_windows()).grid(row=3, column=1, sticky=W)
+
+            var4 = StringVar()  # checkbutton for liability coverage
+            Checkbutton(car_window, text="Liability coverage ($500)", variable=var4,
+                        onvalue="Liability coverage ($500)",
+                        offvalue="", command=lambda: car.liability_coverage()).grid(row=4, column=1, sticky=W)
+
+            var5 = StringVar()  # checkbutton for collision coverage
+            Checkbutton(car_window, text="Collision coverage($2000)", variable=var5,
+                        onvalue="Collision coverage($2000)",
+                        offvalue="", command=lambda: car.collision_coverage()).grid(row=5, column=1, sticky=W)
+
+            var6 = StringVar()  # checkbutton for sound system coverage
+            Checkbutton(car_window, text="Sound system coverage($750)", variable=var6,
+                        onvalue="Sound system coverage($750)",
+                        offvalue="", command=lambda: car.sound_system_coverage()).grid(row=6, column=1, sticky=W)
+
+            var7 = StringVar()
+            Checkbutton(car_window, text="Theft coverage ($700)", variable=var7, onvalue="Theft coverage ($700)",
+                        offvalue="", command=lambda: car.theft_coverage()).grid(row=7, column=1, sticky=W)
+
+            # adds extra options to the varList_extra
+            varList_extra.append(var1)
+            varList_extra.append(var2)
+            varList_extra.append(var3)
+            varList_extra.append(var4)
+            varList_extra.append(var5)
+            varList_extra.append(var6)
+            varList_extra.append(var7)
+
+        str_error_msg = StringVar("")
+
+        Label(car_window, textvariable=str_error_msg, fg="red").grid(row=9, column=1, columnspan=5,
+                                                                     sticky=N + E + S + W)
+
+        Button(car_window, text="Add",
+               command=lambda: [extraFeatureList(str_error_msg, car_window, car)]).grid(row=11, column=1,
+                                                                                        sticky=N + E, padx='5')
+
+        Button(car_window, text="Cancel",
+               command=lambda: close_window(car_window)).grid(row=11, column=2, sticky=W)
+
+    else:
+        MsgBox = messagebox.askquestion('Puchase', "You are purchasing the {} {} without any extra options."
+                                                   "Please press yes to confirm".format(car.get_name(),
+                                                                                        car.get_model()), icon='info')
+        if MsgBox == 'yes':
+            get_car(car_selector.get(ACTIVE)).sell_car()
+            sold_list(car)
+            contact_details(car)
+            close_window(car_window)
+            update_details()
+            delete_car(car)
+            messagebox.showinfo('Sold', "You've  successfully bought the {} {} for {} without extra options ".format(
+                car.get_name(), car.get_model(), car.get_price()))
+            return
+        else:
+            messagebox.showinfo('Return', 'Your purchase has been cancelled')
+            close_window(car_window)  # returns user to application without deleting car
+            return
+
+    if len(car_list) == 0:
+        messagebox.showerror("Error", "All cars have been sold")
+        return
+
+
+def delete_car(car):
+    for car in soldList:
+        selectCSV = open((car[0]) + '.csv', 'r')
+        selectData = csv.reader(selectCSV)
+        select_list = []
+        for row in selectData:
+            if row in [[]]:
+                continue
+            else:
+                select_list.append(row)
+        for obj in select_list:
+            if car[1] in obj:
+                select_list.remove(obj)
+            else:
+                continue
+        # selectWriter = csv.writer(open((car[0]) + '.csv', 'w', newline='\n'))
+        # selectWriter.writerows(select_list)
+        #
+        # if car in car_list:
+        #     car_list.remove(car)
+        #
+        # update_car_selector()
+
+
+def contact_details(car):
+    if len(car_list) == 0:  # if there are no cars in the car list, function can not be used anymore
+        messagebox.showerror("Error", "You have no more cars")
+        return
+
+    contact_window = Toplevel(root)
+    contact_window.title("Contact details")
+    contact_window.option_add("*Font", "LucidaGrande 17")
+
+    contact_details_width = 460
+    contact_details_height = 230
+
+    #   positions the label in the center of the screen
+    contact_details_x = screen_width / 2 - contact_details_width / 2
+    contact_details_y = screen_height / 2 - contact_details_height / 2
+
+    contact_window.geometry(
+        "%dx%d+%d+%d" % (contact_details_width, contact_details_height, contact_details_x, contact_details_y))
+
+    Label(contact_window, text="Please enter your contact details", width=30).grid(row=0, column=0, columnspan=2,
+                                                                                   sticky=N + E + S + W)
+
+    #   creates and adds labels to text entry areas
+    Label(contact_window, text="First Name: ").grid(row=1, column=0, sticky=E)
+    Label(contact_window, text="Last Name: ").grid(row=2, column=0, sticky=E)
+    Label(contact_window, text="Address: ").grid(row=3, column=0, sticky=E)
+    Label(contact_window, text="Phone: ").grid(row=4, column=0, sticky=E)
+
+    str_error_msg = StringVar("")
+    str_customerfirst_name = StringVar("")
+    str_customerlast_name = StringVar("")
+    str_address = StringVar("")
+    str_phone = StringVar("")
+
+    Entry(contact_window, textvariable=str_customerfirst_name).grid(row=1, column=1, sticky=E + W)
+    Entry(contact_window, textvariable=str_customerlast_name).grid(row=2, column=1, sticky=E + W)
+    Entry(contact_window, textvariable=str_address).grid(row=3, column=1, sticky=E + W)
+    Entry(contact_window, textvariable=str_phone).grid(row=4, column=1, sticky=E + W)
+
+    Label(contact_window, textvariable=str_error_msg, fg="red", width=40).grid(row=5, column=0, columnspan=2,
+                                                                               sticky=N + E + S + W)
+
+    Button(contact_window, text="Save", width=7, command=lambda: add_details_and_close(str_error_msg,
+                                                                                       contact_window,
+                                                                                       str_customerfirst_name.get(),
+                                                                                       str_customerlast_name.get(),
+                                                                                       str_address.get(),
+                                                                                       str_phone.get())).grid(row=6,
+                                                                                                              column=0,
+                                                                                                              sticky=E)
+
+
+def add_details_and_close(error, window, customerfirst_name, customerlast_name, address, phone):
+    if "" in [customerfirst_name, customerlast_name, address, phone]:  # checks no fields in the contact form are blank.
+        error.set("No field can be blank")
+        return
+
+    # if address.isnumeric() or address.isalpha():  # checks to see the name contains only letters, no numbers
+    #     print(address)
+    # else:
+    #     error.set("Address must contain both letters and numbers")
+    #     return
+    if len(address) < 5:  # checks to see the address is over 5 characters in order to be legitimate
+        error.set("Address must be over 5 characters")
+        return
+
+    # checks to see the first name is valid
+    try:
+        customer_name = str(customerfirst_name)  # name is set as a string as it is not a number
+    except ValueError:
+        error.set("Name must be characters from A-Z")
+        return
+    if customerfirst_name.isalpha():  # checks to see the name contains only letters, no numbers
+        print(customerfirst_name)
+    elif not customerfirst_name.isalpha():
+        error.set("First name must be characters A-Z")
+        return
+    if len(customerfirst_name) <= 1:  # checks to see the full-name is over 3 characters in order to be legitimate
+        error.set("First name must be be over 1 character")
+        return
+
+    # checks to see the last name is valid
+    try:
+        customerlast_name = str(customerlast_name)  # name is set as a string as it is not a number
+    except ValueError:
+        error.set("Last name must be characters from A-Z")
+        return
+    if customerlast_name.isalpha():  # checks to see the name contains only letters, no numbers
+        print(customerlast_name)
+    elif not customerlast_name.isalpha():  # checks to see the name contains only letters, no numbers
+        error.set("Last name must be characters from A-Z")
+        return
+    if len(customerlast_name) <= 1:  # checks to see the full-name is over 3 characters in order to be legitimate
+        error.set("Last name must be over 1 character")
+        return
+
+    # checks to see the phone number is valid
+    try:
+        phone = str(phone)  # phone must be set as a string in order to check for the .isdigit feature
+    except ValueError:
+        error.set("Phone must be a number")
+        return
+    if phone.isdigit():  # checks to see the phone number does not have letters
+        print(phone)
+    elif not phone.isdigit():  # if phone number contains letter, error will be set
+        error.set('Please enter digits as your phone number')
+        return
+    if len(phone) < 7 or len(phone) >= 11:  # phone number must be between 7 and 10 digits in order to be legitimate
+        error.set("Phone number must be between 7 and 11 digits")
+        return
+
+    # all details from the labels are appended to the contact list
+    else:
+        contactList.append([customerfirst_name, customerlast_name])
+        contactList.append(phone)
+        contactList.append(address)
+        print(customerfirst_name, customerlast_name, phone, address)
+
+    messagebox.showinfo('Added', 'Details have been added')
+    update_details()
+    close_window(window)
+
+
+def new_car():
+    pass
+
+
+def edit_details():
+    pass
+
+
+def close_window(window):
+    window.destroy()  # destroys the current window user is in
+
+
+def exit_application():
+    #   message box asks if user wants to exit the application with a simple yes or no type answer
+    MsgBox = messagebox.askquestion('Exit Application', 'Are you sure you want to exit the application',
+                                    icon='warning')
+    if MsgBox == 'yes':
+        root.destroy()  # ends the program
+    else:
+        messagebox.showinfo('Return', 'You will now return to the application')  # returns user to application
+    return
+
+
+def update_car_selector():
+    # updates selector box for cars in car_list when new changes are made
+    car_selector.delete(0, END)
+    for car in car_list:
+        car_selector.insert(END, car.get_name())
+
+
+def onselect(ebt):
+    #  car details update after 200 milliseconds (0.2 seconds) when clicked on
+    root.after(200, update_details)
+
+
+def store_summary():
+    #   positions store summary in the center of the page
+    width = 300.0
+    height = 120.0
+    x = screen_width / 2 - width / 2
+    y = screen_height / 2 - height / 2
+
+    store_window = Toplevel(root)
+    store_window.title("Car Dealership summary")
+    store_window.option_add("*Font", "LucidaGrande 15")
+    store_window.geometry("%dx%d+%d+%d" % (width, height, x, y))
+
+    # all numbers are set to 0 as nothing has been sold at the beginning
+    price_count = 0.00
+    car_count = 0
+    extra_count = 0.00
+
+    #   gets the total amount of cars sold, price accumulated, extra features cost and adds it to the store summary
+    for c in car_list:
+        price_count += c.get_price_total()
+        car_count += c.get_stock_sold_count()
+        extra_count += c.get_extra_features()
+
+    #   total amounts are placed in a small box
+    string_total_sold = f'Total Cars Sold: {car_count}'
+    string_total_price = f'Store balance: $ {price_count}'
+    string_total_extra = f'Extra features: $ {extra_count}'
+
+    Label(store_window, text=string_total_sold).grid(row=0, column=0, sticky=W)
+    Label(store_window, text=string_total_extra).grid(row=1, column=0, sticky=W)
+    Label(store_window, text=string_total_price).grid(row=2, column=0, sticky=W)
+
+    Button(store_window, text="Ok", width=10, command=lambda: close_window(store_window)).grid(row=6, column=0,
+                                                                                               sticky=S + W)
+
+
+# listbox for the cars
+car_selector = Listbox(root, height=12, width=20, background="#F0F0F5")  # creates the listbox
+update_car_selector()
+car_selector.grid(row=0, column=1, rowspan=5, columnspan=1)  # puts the listbox onto the window
+car_selector.bind('<Button-1>', onselect)
+
+# variables for storing label text in
+str_availability = StringVar(value="Availability: ")
+str_model = StringVar(value="Model: ")
+str_year = StringVar(value="Year: ")
+str_colour = StringVar(value="Colour: ")
+str_price = StringVar(value="Price: $ ")
+
+# labels for all the car details
+name = Label(root, textvariable=str_availability, padx=10, width=19, anchor="w", background="#E3D2AF").grid(
+    row=0, column=2, sticky=W, )
+
+model = Label(root, textvariable=str_model, padx=10, width=19, anchor="w", background="#E3D2AF").grid(
+    row=1, column=2, sticky=W)
+
+year = Label(root, textvariable=str_year, padx=10, width=19, anchor="w", background="#E3D2AF").grid(
+    row=2, column=2, sticky=W)
+
+colour = Label(root, textvariable=str_colour, padx=10, width=19, anchor="w", background="#E3D2AF").grid(
+    row=3, column=2, sticky=W)
+
+price = Label(root, textvariable=str_price, padx=10, width=19, anchor="w", background="#E3D2AF").grid(
+    row=4, column=2, sticky=W)
+
+availability = Label(root, textvariable=str_availability, padx=10, width=19, anchor="w",
+                     background="#E3D2AF").grid(row=5, column=2, sticky=W)
+
+#   the button to sell a car
+btn_sell_car = Button(root, text="Sell a car", background="#DBECF5",
+                      command=lambda: sell_car(get_car(car_selector.get(ACTIVE)))).grid(row=5,
+                                                                                        column=1,
+                                                                                        sticky=N + E + S + W)
+#   the button to add users contact details
+btn_contact_details = Button(root, text="Contact details", background="#DBECF5",
+                             command=lambda: contact_details(get_car(car_selector.get(ACTIVE)))).grid(row=5,
+                                                                                                      column=2,
+                                                                                                      sticky=N + E + S + W)
+
+#   the button that creates a csv with all cars purchased
+btn_cars_purchased = Button(root, text="Cars purchased", background="#DBECF5",
+                            command=lambda: cars_purchased(get_car(car_selector.get(ACTIVE)))).grid(row=6,
+                                                                                                    column=1,
+                                                                                                    sticky=N + E + S + W)
+
+#   the button that creates a summary of the take-away shop eg. price and amount sold
+btn_store_summary = Button(root, text="Store Summary", background="#DBECF5",
+                           command=lambda: store_summary()).grid(row=6,
+                                                                 column=2,
+                                                                 sticky=N + E + S + W)
+
+#   the button that deletes a car from the list
+btn_delete_car = Button(root, text="Delete car", background="#DBECF5",
+                        command=lambda: delete_car(get_car(car_selector.get(ACTIVE)))).grid(row=7,
+                                                                                            column=1,
+                                                                                            sticky=N + E + S + W)
+
+#   the button to exit the application
+exit_button = Button(root, text="Exit", background="#DBECF5", command=lambda: exit_application()).grid(row=7, column=2,
+                                                                                                       sticky=N + E + S + W)
+
+root.mainloop()
